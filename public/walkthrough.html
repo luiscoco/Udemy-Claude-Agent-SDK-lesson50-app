@@ -63,7 +63,7 @@
               pluginErrors: init.plugin_errors || [],
               cliVersion: init.claude_code_version,
             };
-            record.init.push(summary);</code></pre></section><section class="step workflow-step" id="workflow-step-09"><span class="number">09</span><h3>9. Preserve native result fields</h3><p>Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.</p><p class="source">Source: src/agent.ts · lines 228–241 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.result = {
+            record.init.push(summary);</code></pre></section><section class="step workflow-step" id="workflow-step-09"><span class="number">09</span><h3>9. Preserve native result fields</h3><p>Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.</p><p class="source">Source: src/agent.ts · lines 228–237 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.result = {
               attempt: index,
               sessionId: message.session_id,
               status: message.subtype,
@@ -72,11 +72,7 @@
               permissionDenials: message.permission_denials,
               structuredOutputPresent:
                 message.subtype === &quot;success&quot; &amp;&amp;
-                message.structured_output !== undefined,
-              structuredOutput:
-                message.subtype === &quot;success&quot;
-                  ? message.structured_output
-                  : undefined,</code></pre></section><section class="step workflow-step" id="workflow-step-10"><span class="number">10</span><h3>10. Retain SDK exceptions separately</h3><p>TypeScript may throw an ordinary Error. Preserve its name and full redacted report separately from the raw result; the diagnostic classifier reads both.</p><p class="source">Source: src/agent.ts · lines 253–258 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.exception = {
+                message.structured_output !== undefined,</code></pre></section><section class="step workflow-step" id="workflow-step-10"><span class="number">10</span><h3>10. Retain SDK exceptions separately</h3><p>TypeScript may throw an ordinary Error. Preserve its name and full redacted report separately from the raw result; the diagnostic classifier reads both.</p><p class="source">Source: src/agent.ts · lines 253–258 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.exception = {
           name: error instanceof Error ? error.name : &quot;unknown&quot;,
           message: redact(String(error)),
         };

@@ -198,11 +198,11 @@
       "number": 9,
       "title": "Preserve native result fields",
       "source": "src/agent.ts",
-      "code": "record.result = {\n              attempt: index,\n              sessionId: message.session_id,\n              status: message.subtype,\n              costUsd: message.total_cost_usd,\n              stopReason: message.stop_reason,\n              permissionDenials: message.permission_denials,\n              structuredOutputPresent:\n                message.subtype === \"success\" &&\n                message.structured_output !== undefined,\n              structuredOutput:\n                message.subtype === \"success\"\n                  ? message.structured_output\n                  : undefined,",
+      "code": "record.result = {\n              attempt: index,\n              sessionId: message.session_id,\n              status: message.subtype,\n              costUsd: message.total_cost_usd,\n              stopReason: message.stop_reason,\n              permissionDenials: message.permission_denials,\n              structuredOutputPresent:\n                message.subtype === \"success\" &&\n                message.structured_output !== undefined,",
       "language": "typescript",
       "explanation": "Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.",
       "firstLine": 228,
-      "lastLine": 241,
+      "lastLine": 237,
       "anchors": [
         "record.result = {"
       ],

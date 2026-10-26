@@ -222,7 +222,7 @@ const summary = {
 
 Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.
 
-Source: `src/agent.ts`, selected lines 228–241. Surrounding code omitted.
+Source: `src/agent.ts`, selected lines 228–237. Surrounding code omitted.
 
 ```typescript
 record.result = {
@@ -235,10 +235,6 @@ record.result = {
               structuredOutputPresent:
                 message.subtype === "success" &&
                 message.structured_output !== undefined,
-              structuredOutput:
-                message.subtype === "success"
-                  ? message.structured_output
-                  : undefined,
 ```
 
 ### 10. Retain SDK exceptions separately
