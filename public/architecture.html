@@ -1,0 +1,105 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Agent SDK LESSON 50 · Architecture and &lt;em&gt;UML workflow.&lt;/em&gt;</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/code-highlighting.css"></head><body><main><div class="brand"><a href="/">How <span>Claude Agent SDK</span> Works</a><span class="badge">LESSON 50 / TROUBLESHOOTING</span></div><header class="hero"><div><div class="eyebrow">REPRODUCE · DIAGNOSE · FIX</div><h1>Architecture and <em>UML workflow.</em></h1><p class="lead">Every workflow step includes its corresponding coloured code excerpt.</p></div><img src="/astronaut.png" alt="Course astronaut mascot"></header><nav class="nav" aria-label="Application sections"><a href="/">Application lab</a><a href="/learn.html">What you will learn</a><a href="/run.html">How to run</a><a href="/architecture.html" aria-current="page">Architecture & workflow</a><a href="/walkthrough.html">Code walkthrough</a><button id="theme" type="button">Dark mode</button></nav><p class="note">Each attempt uses the real SDK transport. Startup and exit fixtures are explicitly labelled; native model requests, stderr and exceptions stay separate. The diagnostic classifier and evidence viewer are objects in the local host, not external deployed services. Numbered steps group alternative teaching paths.</p><a class="button" href="/architecture.svg" download>Download UML SVG</a><div class="diagram"><img src="/architecture.svg" alt="Thirteen source-linked troubleshooting workflow steps"></div><section class="step workflow-step" id="workflow-step-01"><span class="number">01</span><h3>1. Validate the classroom experiment</h3><p>Only a fixed mode is accepted. Browser requests cannot inject arbitrary prompts, executable paths or tool definitions.</p><p class="source">Source: src/protocol.ts · lines 16–22 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (
+    !input ||
+    Object.keys(input).some((k) =&gt; k !== &quot;mode&quot;) ||
+    !MODES.includes(input.mode)
+  )
+    throw new Error(&quot;Choose a listed diagnostic experiment.&quot;);
+  return { mode: input.mode };</code></pre></section><section class="step workflow-step" id="workflow-step-02"><span class="number">02</span><h3>2. Prepare separate attempt state</h3><p>Each attempt gets its own SDK home, config and debug file beneath a unique temporary workspace. A fictional note is the only permitted file.</p><p class="source">Source: src/workspace.ts · lines 25–33 · selected source; surrounding code omitted</p><pre><code class="language-typescript">async attempt(index: number) {
+      const home = join(root, &quot;attempt-&quot; + index, &quot;home&quot;),
+        config = join(root, &quot;attempt-&quot; + index, &quot;config&quot;),
+        debugFile = join(root, &quot;attempt-&quot; + index, &quot;cli-debug.log&quot;);
+      await mkdir(home, { recursive: true });
+      await mkdir(config, { recursive: true });
+      return { home, config, debugFile };
+    },
+    async snapshot() {</code></pre></section><section class="step workflow-step" id="workflow-step-03"><span class="number">03</span><h3>3. Select the model and limits</h3><p>Start from a known-good model and Read-only task. Fault modes deliberately change the model or turn allowance. JSON runs allow sufficient turns for Read and StructuredOutput.</p><p class="source">Source: src/agent.ts · lines 65–76 · selected source; surrounding code omitted</p><pre><code class="language-typescript">model:
+          fault &amp;&amp; c.mode === &quot;invalidmodel&quot;
+            ? &quot;classroom-model-does-not-exist-50&quot;
+            : MODEL,
+        tools: [&quot;Read&quot;],
+        allowedTools:
+          wantsJson &amp;&amp; !(fault &amp;&amp; c.mode === &quot;missing&quot;)
+            ? [&quot;Read&quot;, &quot;StructuredOutput&quot;]
+            : [&quot;Read&quot;],
+        permissionMode: &quot;dontAsk&quot;,
+        settingSources: [],
+        plugins: [],</code></pre></section><section class="step workflow-step" id="workflow-step-04"><span class="number">04</span><h3>4. Capture actual stderr</h3><p>The SDK stderr callback stores a bounded redacted tail and emits separate observations. Stderr is not an assistant answer and must not overwrite native messages.</p><p class="source">Source: src/agent.ts · lines 134–139 · selected source; surrounding code omitted</p><pre><code class="language-typescript">stderr: (data) =&gt; {
+          const text = redact(data);
+          record.stderr = (record.stderr + text).slice(-64000);
+          observe(&quot;stderr&quot;, { attempt: index, text });
+        },
+      };</code></pre></section><section class="step workflow-step" id="workflow-step-05"><span class="number">05</span><h3>5. Choose the labelled startup fault</h3><p>A missing path, directory override or controlled Node exit fixture exercises the actual SDK startup and transport. The corrected attempt removes these overrides.</p><p class="source">Source: src/agent.ts · lines 140–148 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (fault &amp;&amp; c.mode === &quot;badpath&quot;)
+        options.pathToClaudeCodeExecutable = w.missingBinary;
+      if (fault &amp;&amp; c.mode === &quot;badstart&quot;)
+        options.pathToClaudeCodeExecutable = w.fixtures;
+      if (fault &amp;&amp; c.mode === &quot;exit&quot;) {
+        options.pathToClaudeCodeExecutable = w.exitScript;
+        options.executable = &quot;node&quot;;
+      }
+      if (wantsJson &amp;&amp; !(fault &amp;&amp; c.mode === &quot;missing&quot;))</code></pre></section><section class="step workflow-step" id="workflow-step-06"><span class="number">06</span><h3>6. Request the JSON schema when needed</h3><p>Missing mode deliberately leaves outputFormat unset in its first attempt. Recovery supplies the small schema. This demonstrates an application guard, not an SDK defect.</p><p class="source">Source: src/agent.ts · lines 148–154 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (wantsJson &amp;&amp; !(fault &amp;&amp; c.mode === &quot;missing&quot;))
+        options.outputFormat = { type: &quot;json_schema&quot;, schema: SIMPLE_SCHEMA };
+      if (c.mode === &quot;debug&quot;) {
+        options.debug = true;
+        options.debugFile = dirs.debugFile;
+      }
+      observe(&quot;query-options&quot;, {</code></pre></section><section class="step workflow-step" id="workflow-step-07"><span class="number">07</span><h3>7. Start one real query per attempt</h3><p>query starts the real SDK with the selected options. Consume the async stream and retain every observed type and subtype rather than guessing from visible text.</p><p class="source">Source: src/agent.ts · lines 169–180 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const run = query({
+          prompt: options.outputFormat
+            ? &quot;Read note.txt once, then use StructuredOutput with the classroom code and a short summary.&quot;
+            : PROMPTS[c.mode],
+          options,
+        });
+        for await (const message of run) {
+          const kind = {
+            type: message.type,
+            subtype: &quot;subtype&quot; in message ? message.subtype : null,
+          };
+          record.messages.push(kind);</code></pre></section><section class="step workflow-step" id="workflow-step-08"><span class="number">08</span><h3>8. Inspect initialization metadata</h3><p>Read initialization model, tools, MCP servers, skills and plugin errors. An init message confirms startup, not successful task completion.</p><p class="source">Source: src/agent.ts · lines 184–194 · selected source; surrounding code omitted</p><pre><code class="language-typescript">const summary = {
+              sessionId: init.session_id,
+              model: init.model,
+              tools: init.tools,
+              mcpServers: init.mcp_servers,
+              skills: init.skills || [],
+              plugins: init.plugins || [],
+              pluginErrors: init.plugin_errors || [],
+              cliVersion: init.claude_code_version,
+            };
+            record.init.push(summary);</code></pre></section><section class="step workflow-step" id="workflow-step-09"><span class="number">09</span><h3>9. Preserve native result fields</h3><p>Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.</p><p class="source">Source: src/agent.ts · lines 228–241 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.result = {
+              attempt: index,
+              sessionId: message.session_id,
+              status: message.subtype,
+              costUsd: message.total_cost_usd,
+              stopReason: message.stop_reason,
+              permissionDenials: message.permission_denials,
+              structuredOutputPresent:
+                message.subtype === &quot;success&quot; &amp;&amp;
+                message.structured_output !== undefined,
+              structuredOutput:
+                message.subtype === &quot;success&quot;
+                  ? message.structured_output
+                  : undefined,</code></pre></section><section class="step workflow-step" id="workflow-step-10"><span class="number">10</span><h3>10. Retain SDK exceptions separately</h3><p>TypeScript may throw an ordinary Error. Preserve its name and full redacted report separately from the raw result; the diagnostic classifier reads both.</p><p class="source">Source: src/agent.ts · lines 253–258 · selected source; surrounding code omitted</p><pre><code class="language-typescript">record.exception = {
+          name: error instanceof Error ? error.name : &quot;unknown&quot;,
+          message: redact(String(error)),
+        };
+        observe(&quot;exception&quot;, { attempt: index, ...record.exception });
+      }</code></pre></section><section class="step workflow-step" id="workflow-step-11"><span class="number">11</span><h3>11. Require structured field presence</h3><p>A successful result without the requested field fails application validation. Presence is checked against undefined so valid false or zero values are not mistaken for absence.</p><p class="source">Source: src/diagnostics.ts · lines 17–21 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (result.structuredOutput === undefined)
+    throw new Error(
+      &quot;No structured output: native success alone does not satisfy this application&#x27;s JSON requirement.&quot;,
+    );
+  return result.structuredOutput;</code></pre></section><section class="step workflow-step" id="workflow-step-12"><span class="number">12</span><h3>12. Read the native error report first</h3><p>The exception report after the colon takes priority even if a raw result says success. Keep process exit, startup and native error reports distinct; do not rewrite provider fields.</p><p class="source">Source: src/diagnostics.ts · lines 32–41 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (/Claude Code returned an error result:/i.test(message))
+    return {
+      category: &quot;error-result&quot;,
+      summary: message
+        .split(/Claude Code returned an error result:/i)[1]
+        .trim(),
+      fix: &quot;Read the report after the colon. Verify the selected model exists and is accessible; preserve both the raw result and exception.&quot;,
+    };
+  if (attempt.result?.status &amp;&amp; attempt.result.status !== &quot;success&quot;)
+    return {</code></pre></section><section class="step workflow-step" id="workflow-step-13"><span class="number">13</span><h3>13. Rerun the corrected configuration</h3><p>After a reproduced fault, make a fresh corrected attempt, verify the note is unchanged and publish independent recovery evidence. Finally remove only the unique temporary workspace.</p><p class="source">Source: src/agent.ts · lines 306–314 · selected source; surrounding code omitted</p><pre><code class="language-typescript">if (fault &amp;&amp; !controller.signal.aborted)
+      await attempt(&quot;Apply the fix and rerun&quot;, false, c.mode === &quot;missing&quot;);
+    const after = await w.snapshot();
+    const evidence = {
+      mode: c.mode,
+      attempts,
+      results: attempts.flatMap((a) =&gt; (a.result ? [a.result] : [])),
+      observations,
+      fixtureUnchanged: before.hash === after.hash,</code></pre></section><footer>CLAUDE AGENT SDK · LESSON 50 · INIT · RESULT · STDERR<br>TypeScript · local runtime · API key stays on the server</footer></main><script src="/navigation.js"></script><script src="/prism.js"></script><script src="/prism-markup.min.js"></script><script src="/prism-yaml.min.js"></script><script src="/prism-markdown.min.js"></script><script src="/prism-python.min.js"></script><script src="/code-highlighting.js"></script><script src="/marked.umd.js"></script><script src="/purify.min.js"></script></body></html>

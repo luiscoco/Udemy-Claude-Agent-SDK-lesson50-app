@@ -1,0 +1,273 @@
+{
+  "lanes": [
+    "Student UI",
+    "TypeScript host",
+    "Agent SDK / CLI",
+    "Diagnostic classifier",
+    "Evidence viewer"
+  ],
+  "arrows": [
+    [
+      0,
+      1,
+      "1. Validate the classroom experiment"
+    ],
+    [
+      1,
+      1,
+      "2. Prepare separate attempt state"
+    ],
+    [
+      1,
+      1,
+      "3. Select the model and limits"
+    ],
+    [
+      2,
+      1,
+      "4. Capture actual stderr"
+    ],
+    [
+      1,
+      1,
+      "5. Choose the labelled startup fault"
+    ],
+    [
+      1,
+      1,
+      "6. Request the JSON schema when needed"
+    ],
+    [
+      1,
+      2,
+      "7. Start one real query per attempt"
+    ],
+    [
+      2,
+      1,
+      "8. Inspect initialization metadata"
+    ],
+    [
+      2,
+      1,
+      "9. Preserve native result fields"
+    ],
+    [
+      2,
+      1,
+      "10. Retain SDK exceptions separately"
+    ],
+    [
+      1,
+      3,
+      "11. Require structured field presence"
+    ],
+    [
+      3,
+      4,
+      "12. Read the native error report first"
+    ],
+    [
+      1,
+      4,
+      "13. Rerun the corrected configuration"
+    ]
+  ],
+  "steps": [
+    {
+      "number": 1,
+      "title": "Validate the classroom experiment",
+      "source": "src/protocol.ts",
+      "code": "if (\n    !input ||\n    Object.keys(input).some((k) => k !== \"mode\") ||\n    !MODES.includes(input.mode)\n  )\n    throw new Error(\"Choose a listed diagnostic experiment.\");\n  return { mode: input.mode };",
+      "language": "typescript",
+      "explanation": "Only a fixed mode is accepted. Browser requests cannot inject arbitrary prompts, executable paths or tool definitions.",
+      "firstLine": 16,
+      "lastLine": 22,
+      "anchors": [
+        "if ("
+      ],
+      "sourceSHA256": "e23d1e5d3c82777dfeacde8a820fc48127de954171a292b8c91b3d904e017397",
+      "narration": "Step 1. Only a fixed mode is accepted. Browser requests cannot inject arbitrary prompts, executable paths or tool definitions. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 2,
+      "title": "Prepare separate attempt state",
+      "source": "src/workspace.ts",
+      "code": "async attempt(index: number) {\n      const home = join(root, \"attempt-\" + index, \"home\"),\n        config = join(root, \"attempt-\" + index, \"config\"),\n        debugFile = join(root, \"attempt-\" + index, \"cli-debug.log\");\n      await mkdir(home, { recursive: true });\n      await mkdir(config, { recursive: true });\n      return { home, config, debugFile };\n    },\n    async snapshot() {",
+      "language": "typescript",
+      "explanation": "Each attempt gets its own SDK home, config and debug file beneath a unique temporary workspace. A fictional note is the only permitted file.",
+      "firstLine": 25,
+      "lastLine": 33,
+      "anchors": [
+        "async attempt(index: number) {"
+      ],
+      "sourceSHA256": "9a86dc68dc6f662125e5b24d363e9ee940e0bcd3171350ac9775ca06b3576d12",
+      "narration": "Step 2. Each attempt gets its own SDK home, config and debug file beneath a unique temporary workspace. A fictional note is the only permitted file. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 3,
+      "title": "Select the model and limits",
+      "source": "src/agent.ts",
+      "code": "model:\n          fault && c.mode === \"invalidmodel\"\n            ? \"classroom-model-does-not-exist-50\"\n            : MODEL,\n        tools: [\"Read\"],\n        allowedTools:\n          wantsJson && !(fault && c.mode === \"missing\")\n            ? [\"Read\", \"StructuredOutput\"]\n            : [\"Read\"],\n        permissionMode: \"dontAsk\",\n        settingSources: [],\n        plugins: [],",
+      "language": "typescript",
+      "explanation": "Start from a known-good model and Read-only task. Fault modes deliberately change the model or turn allowance. JSON runs allow sufficient turns for Read and StructuredOutput.",
+      "firstLine": 65,
+      "lastLine": 76,
+      "anchors": [
+        "model:"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 3. Start from a known-good model and Read-only task. Fault modes deliberately change the model or turn allowance. JSON runs allow sufficient turns for Read and StructuredOutput. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 4,
+      "title": "Capture actual stderr",
+      "source": "src/agent.ts",
+      "code": "stderr: (data) => {\n          const text = redact(data);\n          record.stderr = (record.stderr + text).slice(-64000);\n          observe(\"stderr\", { attempt: index, text });\n        },\n      };",
+      "language": "typescript",
+      "explanation": "The SDK stderr callback stores a bounded redacted tail and emits separate observations. Stderr is not an assistant answer and must not overwrite native messages.",
+      "firstLine": 134,
+      "lastLine": 139,
+      "anchors": [
+        "stderr: (data) => {"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 4. The SDK stderr callback stores a bounded redacted tail and emits separate observations. Stderr is not an assistant answer and must not overwrite native messages. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 5,
+      "title": "Choose the labelled startup fault",
+      "source": "src/agent.ts",
+      "code": "if (fault && c.mode === \"badpath\")\n        options.pathToClaudeCodeExecutable = w.missingBinary;\n      if (fault && c.mode === \"badstart\")\n        options.pathToClaudeCodeExecutable = w.fixtures;\n      if (fault && c.mode === \"exit\") {\n        options.pathToClaudeCodeExecutable = w.exitScript;\n        options.executable = \"node\";\n      }\n      if (wantsJson && !(fault && c.mode === \"missing\"))",
+      "language": "typescript",
+      "explanation": "A missing path, directory override or controlled Node exit fixture exercises the actual SDK startup and transport. The corrected attempt removes these overrides.",
+      "firstLine": 140,
+      "lastLine": 148,
+      "anchors": [
+        "if (fault && c.mode === \"badpath\")"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 5. A missing path, directory override or controlled Node exit fixture exercises the actual SDK startup and transport. The corrected attempt removes these overrides. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 6,
+      "title": "Request the JSON schema when needed",
+      "source": "src/agent.ts",
+      "code": "if (wantsJson && !(fault && c.mode === \"missing\"))\n        options.outputFormat = { type: \"json_schema\", schema: SIMPLE_SCHEMA };\n      if (c.mode === \"debug\") {\n        options.debug = true;\n        options.debugFile = dirs.debugFile;\n      }\n      observe(\"query-options\", {",
+      "language": "typescript",
+      "explanation": "Missing mode deliberately leaves outputFormat unset in its first attempt. Recovery supplies the small schema. This demonstrates an application guard, not an SDK defect.",
+      "firstLine": 148,
+      "lastLine": 154,
+      "anchors": [
+        "if (wantsJson && !(fault && c.mode === \"missing\"))"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 6. Missing mode deliberately leaves outputFormat unset in its first attempt. Recovery supplies the small schema. This demonstrates an application guard, not an SDK defect. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 7,
+      "title": "Start one real query per attempt",
+      "source": "src/agent.ts",
+      "code": "const run = query({\n          prompt: options.outputFormat\n            ? \"Read note.txt once, then use StructuredOutput with the classroom code and a short summary.\"\n            : PROMPTS[c.mode],\n          options,\n        });\n        for await (const message of run) {\n          const kind = {\n            type: message.type,\n            subtype: \"subtype\" in message ? message.subtype : null,\n          };\n          record.messages.push(kind);",
+      "language": "typescript",
+      "explanation": "query starts the real SDK with the selected options. Consume the async stream and retain every observed type and subtype rather than guessing from visible text.",
+      "firstLine": 169,
+      "lastLine": 180,
+      "anchors": [
+        "const run = query({"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 7. query starts the real SDK with the selected options. Consume the async stream and retain every observed type and subtype rather than guessing from visible text. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 8,
+      "title": "Inspect initialization metadata",
+      "source": "src/agent.ts",
+      "code": "const summary = {\n              sessionId: init.session_id,\n              model: init.model,\n              tools: init.tools,\n              mcpServers: init.mcp_servers,\n              skills: init.skills || [],\n              plugins: init.plugins || [],\n              pluginErrors: init.plugin_errors || [],\n              cliVersion: init.claude_code_version,\n            };\n            record.init.push(summary);",
+      "language": "typescript",
+      "explanation": "Read initialization model, tools, MCP servers, skills and plugin errors. An init message confirms startup, not successful task completion.",
+      "firstLine": 184,
+      "lastLine": 194,
+      "anchors": [
+        "const summary = {"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 8. Read initialization model, tools, MCP servers, skills and plugin errors. An init message confirms startup, not successful task completion. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 9,
+      "title": "Preserve native result fields",
+      "source": "src/agent.ts",
+      "code": "record.result = {\n              attempt: index,\n              sessionId: message.session_id,\n              status: message.subtype,\n              costUsd: message.total_cost_usd,\n              stopReason: message.stop_reason,\n              permissionDenials: message.permission_denials,\n              structuredOutputPresent:\n                message.subtype === \"success\" &&\n                message.structured_output !== undefined,\n              structuredOutput:\n                message.subtype === \"success\"\n                  ? message.structured_output\n                  : undefined,",
+      "language": "typescript",
+      "explanation": "Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception.",
+      "firstLine": 228,
+      "lastLine": 241,
+      "anchors": [
+        "record.result = {"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 9. Keep the native subtype, session, stop reason, denials, estimate and structured-output presence. A raw success result can still be followed by an SDK error exception. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 10,
+      "title": "Retain SDK exceptions separately",
+      "source": "src/agent.ts",
+      "code": "record.exception = {\n          name: error instanceof Error ? error.name : \"unknown\",\n          message: redact(String(error)),\n        };\n        observe(\"exception\", { attempt: index, ...record.exception });\n      }",
+      "language": "typescript",
+      "explanation": "TypeScript may throw an ordinary Error. Preserve its name and full redacted report separately from the raw result; the diagnostic classifier reads both.",
+      "firstLine": 253,
+      "lastLine": 258,
+      "anchors": [
+        "record.exception = {"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 10. TypeScript may throw an ordinary Error. Preserve its name and full redacted report separately from the raw result; the diagnostic classifier reads both. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 11,
+      "title": "Require structured field presence",
+      "source": "src/diagnostics.ts",
+      "code": "if (result.structuredOutput === undefined)\n    throw new Error(\n      \"No structured output: native success alone does not satisfy this application's JSON requirement.\",\n    );\n  return result.structuredOutput;",
+      "language": "typescript",
+      "explanation": "A successful result without the requested field fails application validation. Presence is checked against undefined so valid false or zero values are not mistaken for absence.",
+      "firstLine": 17,
+      "lastLine": 21,
+      "anchors": [
+        "if (result.structuredOutput === undefined)"
+      ],
+      "sourceSHA256": "85c26512f16ced52741c9f9cf9e44487518dfa250b5ee33bf2224042bb455095",
+      "narration": "Step 11. A successful result without the requested field fails application validation. Presence is checked against undefined so valid false or zero values are not mistaken for absence. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 12,
+      "title": "Read the native error report first",
+      "source": "src/diagnostics.ts",
+      "code": "if (/Claude Code returned an error result:/i.test(message))\n    return {\n      category: \"error-result\",\n      summary: message\n        .split(/Claude Code returned an error result:/i)[1]\n        .trim(),\n      fix: \"Read the report after the colon. Verify the selected model exists and is accessible; preserve both the raw result and exception.\",\n    };\n  if (attempt.result?.status && attempt.result.status !== \"success\")\n    return {",
+      "language": "typescript",
+      "explanation": "The exception report after the colon takes priority even if a raw result says success. Keep process exit, startup and native error reports distinct; do not rewrite provider fields.",
+      "firstLine": 32,
+      "lastLine": 41,
+      "anchors": [
+        "if (/Claude Code returned an error result:/i.test(message))"
+      ],
+      "sourceSHA256": "85c26512f16ced52741c9f9cf9e44487518dfa250b5ee33bf2224042bb455095",
+      "narration": "Step 12. The exception report after the colon takes priority even if a raw result says success. Keep process exit, startup and native error reports distinct; do not rewrite provider fields. This source excerpt shows the corresponding application statement."
+    },
+    {
+      "number": 13,
+      "title": "Rerun the corrected configuration",
+      "source": "src/agent.ts",
+      "code": "if (fault && !controller.signal.aborted)\n      await attempt(\"Apply the fix and rerun\", false, c.mode === \"missing\");\n    const after = await w.snapshot();\n    const evidence = {\n      mode: c.mode,\n      attempts,\n      results: attempts.flatMap((a) => (a.result ? [a.result] : [])),\n      observations,\n      fixtureUnchanged: before.hash === after.hash,",
+      "language": "typescript",
+      "explanation": "After a reproduced fault, make a fresh corrected attempt, verify the note is unchanged and publish independent recovery evidence. Finally remove only the unique temporary workspace.",
+      "firstLine": 306,
+      "lastLine": 314,
+      "anchors": [
+        "if (fault && !controller.signal.aborted)"
+      ],
+      "sourceSHA256": "fc3884cbf5a3a46fa142f5ce13b01d9ce3115705427b919a52df6f05f9dff429",
+      "narration": "Step 13. After a reproduced fault, make a fresh corrected attempt, verify the note is unchanged and publish independent recovery evidence. Finally remove only the unique temporary workspace. This source excerpt shows the corresponding application statement."
+    }
+  ]
+}
